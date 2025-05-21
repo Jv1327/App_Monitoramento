@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ImageBackground, Image, Alert } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 const LoginScreen = () => {
   const [login, setLogin] = useState('');
@@ -14,14 +15,12 @@ const LoginScreen = () => {
     console.log('Valor de senha:', senha);
 
     if (!login.trim() || !senha.trim()) {
-      console.log('Campos de login ou senha vazios!');
       Alert.alert('Erro', 'Por favor, preencha o login e a senha.');
-      return; // Impede a execução do restante da função
+      return;
     }
 
     const storedPacientes = await AsyncStorage.getItem('pacientes');
     const pacientes = storedPacientes ? JSON.parse(storedPacientes) : [];
-    console.log('Pacientes do AsyncStorage:', pacientes);
 
     const adminLogin = 'Admin_@123';
     const adminSenha = 'TechTrio';
@@ -29,15 +28,11 @@ const LoginScreen = () => {
     const usuarioEncontrado = pacientes.find(
       (paciente) => paciente.login === login && paciente.senha === senha
     );
-    console.log('Usuário encontrado:', usuarioEncontrado);
 
     if (usuarioEncontrado || (login === adminLogin && senha === adminSenha)) {
-      console.log('Login realizado com sucesso!');
-
       if (login === adminLogin && senha === adminSenha) {
-        console.log('Redirecionando para a página de Administrador...');
         router.push('/admin');
-      } else if (usuarioEncontrado) {
+      } else {
         await AsyncStorage.setItem('nomePacienteLogado', usuarioEncontrado.nome);
         router.push('/dailycontrol');
       }
@@ -47,15 +42,38 @@ const LoginScreen = () => {
   };
 
   const handleCadastro = () => {
-    console.log('Botão "Cadastrar" pressionado!');
     router.push('/cadastro');
+  };
+
+  const handleBiometricAuth = async () => {
+    const isHardwareSupported = await LocalAuthentication.hasHardwareAsync();
+    const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+    if (!isHardwareSupported || !isEnrolled) {
+      Alert.alert('Biometria não disponível', 'Seu dispositivo não suporta ou não tem biometria cadastrada.');
+      return;
+    }
+
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Autentique-se para continuar',
+      fallbackLabel: 'Usar senha',
+      disableDeviceFallback: true,
+    });
+
+    if (result.success) {
+      Alert.alert('Sucesso', 'Autenticação biométrica realizada com sucesso!');
+      router.push('/dailycontrol');
+    } else {
+      Alert.alert('Falha', 'Autenticação biométrica falhou ou foi cancelada.');
+    }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.fieldset}>
         <View style={styles.center}>
-          <Image source={require('../../App-Final/assets/images/Nosso_Lar _remove.jpg')} style={styles.logo} />
+          <Image source={require('../../App_Monitoramento/assets/images/Nosso_Lar _remove.jpg')} style={styles.logo} />
           <Text style={styles.title}>Plataforma Online CEPIM</Text>
           <View style={styles.form}>
             <Text style={styles.label}>Login:</Text>
@@ -79,49 +97,49 @@ const LoginScreen = () => {
             <TouchableOpacity style={styles.button} onPress={handleCadastro}>
               <Text style={styles.buttonText}>Cadastrar</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={handleBiometricAuth}>
+              <Text style={styles.buttonText}>Entrar com Biometria</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
     </View>
-
   );
 };
-
 
 const styles = StyleSheet.create({
   backgroundImage: {
     flex: 1,
     resizeMode: 'cover',
     justifyContent: 'center',
-    backgroundColor: 'rgba(253, 253, 253, 0.49)', // Um fundo cinza claro comum em interfaces iOS
+    backgroundColor: 'rgba(253, 253, 253, 0.49)',
   },
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 10, // Aumentar um pouco o padding horizontal
-
+    paddingHorizontal: 10,
   },
   fieldset: {
-    width: '100%', // Ocupar a largura disponível no container
-    maxWidth: 350, // Largura máxima para telas maiores
+    width: '100%',
+    maxWidth: 350,
     padding: 25,
     borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)', // Fundo branco quase opaco
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },
   center: {
     alignItems: 'center',
   },
   logo: {
-    width: 120, // Ajustar tamanho do logo
+    width: 120,
     height: 100,
     resizeMode: 'contain',
     marginBottom: 30,
   },
   title: {
-    fontSize: 28, // Ajustar tamanho do título
+    fontSize: 28,
     textAlign: 'center',
-    color: '#333', // Cor de texto mais escura
+    color: '#333',
     marginBottom: 35,
     fontWeight: 'bold',
   },
@@ -146,7 +164,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   button: {
-    backgroundColor: '#007aff', // Azul característico de botões iOS
+    backgroundColor: '#007aff',
     color: 'white',
     fontSize: 18,
     paddingVertical: 12,
@@ -157,32 +175,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
-  },
-  cadastroButton: { // Estilo específico para o botão de cadastro
-    backgroundColor: '#f0f0f0', // Um cinza claro para o botão secundário
-    borderColor: '#ccc',
-    borderWidth: 1,
-  },
-  cadastroButtonText: {
-    color: '#333',
-    fontWeight: 'normal',
-  },
-  buttonContainer: { // Container para organizar os botões (se necessário lado a lado)
-    flexDirection: 'column', 
-    width: '100%',
-    marginTop: 15,
-  },
-  phoneWrapper: {
-    width: 400,
-    maxWidth: '100%',
-    backgroundColor: '#f7f7f7',
-    padding: 20,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 5,
   },
 });
 
